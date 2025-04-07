@@ -3,36 +3,30 @@
 <head>
     <title>College Attendance Calculator</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         table { width: 100%; border-collapse: collapse; margin: 20px 0; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         input { width: 60px; padding: 5px; }
-        .safe { background-color: #ddffdd; }
-        .warning { background-color: #fff3cd; }
-        .danger { background-color: #ffdddd; }
-        .highlight { font-weight: bold; }
+        .highlight { background-color: #ffffcc; }
     </style>
 </head>
 <body>
-    <h1>Attendance Calculator (ERP-Compatible)</h1>
+    <h1>Attendance Calculator</h1>
     
     <div>
         <label for="totalRequired">Minimum Required Attendance %:</label>
         <input type="number" id="totalRequired" value="75" min="0" max="100">%
-        <button onclick="autoFillFromERP()">Auto-Fill from ERP</button>
     </div>
     
     <table id="attendanceTable">
         <thead>
             <tr>
-                <th>Code</th>
-                <th>Description</th>
-                <th>Max Hours</th>
-                <th>Att. Hours</th>
+                <th>Subject</th>
+                <th>Classes Held</th>
+                <th>Classes Attended</th>
                 <th>Current %</th>
                 <th>Future Absences</th>
-                <th>Projected Hours</th>
                 <th>Projected %</th>
                 <th>Status</th>
             </tr>
@@ -40,142 +34,85 @@
         <tbody>
             <!-- Rows will be added here -->
         </tbody>
-        <tfoot>
-            <tr class="highlight">
-                <td colspan="2">Total</td>
-                <td id="totalMax">0</td>
-                <td id="totalAttended">0</td>
-                <td id="totalCurrent">0%</td>
-                <td id="totalFutureAbsences">0</td>
-                <td id="totalProjected">0</td>
-                <td id="totalProjectedPct">0%</td>
-                <td id="totalStatus">-</td>
-            </tr>
-        </tfoot>
     </table>
     
     <button onclick="addSubject()">Add Subject</button>
     <button onclick="calculateAll()">Calculate All</button>
     
     <script>
-        // Sample data matching your ERP format
-        const sampleERPDATA = [
-            {code: "2ICSC204J", desc: "DESIGN AND ANALYSIS OF ALGORITHMS", max: 63, att: 63},
-            {code: "2ICSC205P", desc: "DATABASE MANAGEMENT SYSTEMS", max: 47, att: 47},
-            {code: "2ICSC206T", desc: "ARTIFICIAL INTELLIGENCE", max: 36, att: 35},
-            {code: "2ICSE25IT", desc: "DIGITAL IMAGE PROCESSING", max: 39, att: 39},
-            {code: "2ILEM202T", desc: "UNIVERSAL HUMAN VALUES - II", max: 34, att: 34},
-            {code: "2IMAB204T", desc: "PROBABILITY AND QUEUEING THEORY", max: 50, att: 50},
-            {code: "2IPDH20IT", desc: "SOCIAL ENGINEERING", max: 6, att: 6},
-            {code: "2IPDH209T", desc: "SOCIAL ENGINEERING", max: 14, att: 10},
-            {code: "2IPDM202L", desc: "CRITICAL AND CREATIVE THINKING SKILLS", max: 4, att: 4},
-            {code: "CDC2", desc: "CRITICAL AND CREATIVE THINKING SKILLS (IV)", max: 19, att: 17}
-        ];
-
-        function addSubject(code = "", desc = "", max = 0, att = 0) {
+        function addSubject() {
             const table = document.getElementById('attendanceTable').getElementsByTagName('tbody')[0];
             const newRow = table.insertRow();
             
             newRow.innerHTML = `
-                <td><input type="text" class="code" value="${code}" placeholder="Course Code"></td>
-                <td><input type="text" class="desc" value="${desc}" placeholder="Description" style="width: 200px;"></td>
-                <td><input type="number" class="max" min="0" value="${max}"></td>
-                <td><input type="number" class="att" min="0" value="${att}"></td>
+                <td><input type="text" class="subject" placeholder="Subject Name"></td>
+                <td><input type="number" class="held" min="0" value="0"></td>
+                <td><input type="number" class="attended" min="0" value="0"></td>
                 <td class="current">0%</td>
-                <td><input type="number" class="future-absences" min="0" value="0"></td>
-                <td class="projected-hours">0</td>
+                <td><input type="number" class="future-absences" min="0" value="0" onchange="updateProjected(this)"></td>
                 <td class="projected">0%</td>
                 <td class="status">-</td>
             `;
+        }
+        
+        function updateProjected(input) {
+            const row = input.closest('tr');
+            const held = parseInt(row.querySelector('.held').value) || 0;
+            const attended = parseInt(row.querySelector('.attended').value) || 0;
+            const futureAbsences = parseInt(input.value) || 0;
+            
+            // Calculate projected percentage
+            const totalFutureClasses = held + futureAbsences;
+            const projectedPercentage = totalFutureClasses > 0 ? (attended / totalFutureClasses) * 100 : 0;
+            row.querySelector('.projected').textContent = projectedPercentage.toFixed(2) + '%';
+            
+            // Update status immediately
+            const required = parseInt(document.getElementById('totalRequired').value) / 100;
+            const statusCell = row.querySelector('.status');
+            if (projectedPercentage >= required * 100) {
+                statusCell.textContent = "✅ Safe";
+                statusCell.style.color = "green";
+            } else {
+                statusCell.textContent = "⚠️ Low";
+                statusCell.style.color = "red";
+            }
         }
         
         function calculateAll() {
             const required = parseInt(document.getElementById('totalRequired').value) / 100;
             const rows = document.getElementById('attendanceTable').getElementsByTagName('tbody')[0].rows;
             
-            let totalMax = 0;
-            let totalAttended = 0;
-            let totalFutureAbsences = 0;
-            let totalProjected = 0;
-            
             for (let row of rows) {
-                const max = parseInt(row.querySelector('.max').value) || 0;
-                const att = parseInt(row.querySelector('.att').value) || 0;
+                const held = parseInt(row.querySelector('.held').value) || 0;
+                const attended = parseInt(row.querySelector('.attended').value) || 0;
                 const futureAbsences = parseInt(row.querySelector('.future-absences').value) || 0;
                 
                 // Calculate current percentage
-                const currentPercentage = max > 0 ? (att / max) * 100 : 0;
+                const currentPercentage = held > 0 ? (attended / held) * 100 : 0;
                 row.querySelector('.current').textContent = currentPercentage.toFixed(2) + '%';
                 
-                // Calculate projected hours and percentage
-                const projectedHours = max + futureAbsences;
-                const projectedAttended = att;
-                const projectedPercentage = projectedHours > 0 ? (projectedAttended / projectedHours) * 100 : 0;
-                
-                row.querySelector('.projected-hours').textContent = projectedHours;
+                // Calculate projected percentage
+                const totalFutureClasses = held + futureAbsences;
+                const projectedPercentage = totalFutureClasses > 0 ? (attended / totalFutureClasses) * 100 : 0;
                 row.querySelector('.projected').textContent = projectedPercentage.toFixed(2) + '%';
-                
-                // Update totals
-                totalMax += max;
-                totalAttended += att;
-                totalFutureAbsences += futureAbsences;
-                totalProjected += projectedHours;
                 
                 // Set status
                 const statusCell = row.querySelector('.status');
                 if (projectedPercentage >= required * 100) {
                     statusCell.textContent = "✅ Safe";
-                    statusCell.className = "status safe";
-                } else if (projectedPercentage >= (required * 100 - 5)) {
-                    statusCell.textContent = "⚠️ Warning";
-                    statusCell.className = "status warning";
+                    statusCell.style.color = "green";
                 } else {
-                    statusCell.textContent = "❌ Danger";
-                    statusCell.className = "status danger";
+                    statusCell.textContent = "⚠️ Low";
+                    statusCell.style.color = "red";
                 }
             }
-            
-            // Update totals row
-            document.getElementById('totalMax').textContent = totalMax;
-            document.getElementById('totalAttended').textContent = totalAttended;
-            document.getElementById('totalFutureAbsences').textContent = totalFutureAbsences;
-            document.getElementById('totalProjected').textContent = totalProjected;
-            
-            const totalCurrentPct = totalMax > 0 ? (totalAttended / totalMax) * 100 : 0;
-            const totalProjectedPct = totalProjected > 0 ? (totalAttended / totalProjected) * 100 : 0;
-            
-            document.getElementById('totalCurrent').textContent = totalCurrentPct.toFixed(2) + '%';
-            document.getElementById('totalProjectedPct').textContent = totalProjectedPct.toFixed(2) + '%';
-            
-            const totalStatus = document.getElementById('totalStatus');
-            if (totalProjectedPct >= required * 100) {
-                totalStatus.textContent = "✅ Safe";
-                totalStatus.className = "safe";
-            } else if (totalProjectedPct >= (required * 100 - 5)) {
-                totalStatus.textContent = "⚠️ Warning";
-                totalStatus.className = "warning";
-            } else {
-                totalStatus.textContent = "❌ Danger";
-                totalStatus.className = "danger";
-            }
         }
         
-        function autoFillFromERP() {
-            // Clear existing rows
-            const tbody = document.getElementById('attendanceTable').getElementsByTagName('tbody')[0];
-            tbody.innerHTML = '';
-            
-            // Add sample data
-            sampleERPDATA.forEach(subject => {
-                addSubject(subject.code, subject.desc, subject.max, subject.att);
-            });
-            
-            calculateAll();
-        }
-        
-        // Initialize with some sample data
+        // Add 5 subjects by default
         window.onload = function() {
-            autoFillFromERP();
+            for (let i = 0; i < 5; i++) {
+                addSubject();
+            }
         };
     </script>
 </body>
